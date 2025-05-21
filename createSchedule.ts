@@ -6,8 +6,9 @@ async function run() {
 
   // Input values (normally come from CMS/config)
   const userJourneyId = 'test-user-123';
-  // const triggerTime = new Date(Date.now() + 5000); // 5 seconds from now
-  const triggerTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+  const triggerTime = new Date(Date.now() + 5000); // 5 seconds from now
+  // const triggerTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+  
   const uniqueSuffix = Date.now(); // makes ID unique per run
   const scheduleId = `auto-trigger-${userJourneyId}-${uniqueSuffix}`;
 

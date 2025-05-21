@@ -1,6 +1,4 @@
 // src/workflows/osExecuteAutoTriggerActions.ts
-import { proxyActivities } from '@temporalio/workflow';
-
 export interface AutoTriggerArgs {
   actions: string[]; // you can refine this
   data: Record<string, any>;
