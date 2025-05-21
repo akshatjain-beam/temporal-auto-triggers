@@ -16,24 +16,3 @@ export async function osExecuteAutoTriggerActions({ actions, data }: AutoTrigger
   await handleAutoTriggerActions({ actions, data });
   console.log('✅ osExecuteAutoTriggerActions workflow completed');
 }
-
-
-// // src/workflows/osExecuteAutoTriggerActions.ts
-// export interface AutoTriggerArgs {
-//   actions: string[]; // you can refine this
-//   data: Record<string, any>;
-// }
-
-// export async function osExecuteAutoTriggerActions({ actions, data }: AutoTriggerArgs) {
-//   console.log('🚀 AutoTrigger Workflow started');
-//   console.log('📦 Actions:', actions);
-//   console.log('📄 Data:', data);
-
-//   // Simulate doing something (send email, etc.)
-//   for (const action of actions) {
-//     console.log(`🔧 Executing action: ${action}`);
-//   }
-
-//   console.log('✅ AutoTrigger Workflow completed');
-  
-// }
