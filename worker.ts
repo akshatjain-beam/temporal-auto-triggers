@@ -1,9 +1,16 @@
-// worker.ts (ESM style)
+// worker.ts
 import { Worker } from '@temporalio/worker';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import * as activities from './activities/index.ts';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function run() {
   const worker = await Worker.create({
-    workflowsPath: new URL('./workflow/osExecuteAutoTriggerActions.ts', import.meta.url).pathname,
+    workflowsPath: path.join(__dirname, 'workflow'), // ✅ Use path.join to avoid file:// issues
+    activities,
     taskQueue: 'auto-triggers',
   });
 

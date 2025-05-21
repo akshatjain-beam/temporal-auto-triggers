@@ -1,132 +1,144 @@
+# ⏱️ Temporal One-Time Scheduler
+
 ## 🧾 Code-Based Project Summary
 
-This project implements a **Temporal-based one-time workflow scheduling system** that allows pre-configured actions (like sending emails or logging events) to be executed relative to a future event (e.g. a user's check-in time).
+This project implements a **Temporal-based one-time workflow scheduling system** that allows pre-configured actions (like sending emails or logging events) to be executed relative to a future event (e.g. a user's check-in time). It also supports automatic cleanup (pause or delete) of completed schedules.
 
 ---
 
-## 🧩 Components in Code
+## 🧩 Folder Structure
 
-### 1. `createSchedule.ts`
-
-* **Purpose**: Creates a one-time Temporal schedule to run a specific workflow at a calculated future time.
-* **Key logic**:
-
-  * Computes a `triggerTime` (e.g., `Date.now() + 1 hour`)
-  * Constructs a one-off **cron expression** using that time
-  * Schedules the `osExecuteAutoTriggerActions` workflow with:
-
-    * `actions`: e.g., `["sendEmail", "logEvent"]`
-    * `data`: arbitrary input like `{ userId, note }`
-  * Assigns a unique `scheduleId` and `workflowId`
-
----
-
-### 2. `workflow/osExecuteAutoTriggerActions.ts`
-
-* **Purpose**: Executes the triggered automation logic.
-* **Key logic**:
-
-  * Iterates over `actions` and performs logic (mocked for now)
-  * After completion, calls an **activity** to delete the schedule (`deleteSchedule(scheduleId)`)
-  * This is done using `proxyActivities` to avoid using `@temporalio/client` inside the workflow
+```
+.
+├── activities
+│   └── index.ts                          # Activity handlers (e.g., send email, pause schedule)
+├── createPauseMonitorSchedule.ts        # Creates daily watcher schedule (for cleanup)
+├── createSchedule.ts                    # Creates a one-time schedule to run a workflow
+├── package-lock.json
+├── package.json
+├── readme.md
+├── scheduleWatcher.ts                   # Manually inspects and pauses completed schedules
+├── tsconfig.json
+├── worker.ts                            # Temporal worker: runs workflows and activities
+└── workflow
+    ├── index.ts                         # Re-exports workflows for bundling
+    ├── osExecuteAutoTriggerActions.ts   # Main workflow for executing scheduled actions
+    └── pauseSchedulesWithCompletedWorkflows.ts  # Workflow to pause completed schedules
+```
 
 ---
 
-### 3. `worker.ts`
+## 🧩 Code Components
 
-* **Purpose**: Runs the Temporal worker that:
+### ✅ 1. `createSchedule.ts`
 
-  * Listens on the `auto-triggers` task queue
-  * Executes workflows and activities
-* **Config**:
+Creates a **one-time schedule** that will trigger a workflow at a specific time.
 
-  * Uses `workflowsPath` to include your workflow code
-  * Registers `activities` for external operations
+- Uses `@temporalio/client`
+- Dynamically generates a cron string for the exact trigger moment
+- Passes `actions` and `data` to the workflow
+- Assigns unique `scheduleId` and `workflowId`
 
 ---
 
-### 4. `scheduleWatcher.ts`
+### ✅ 2. `workflow/osExecuteAutoTriggerActions.ts`
 
-* **Purpose**: Monitors all schedules to:
+The core workflow that gets executed by the schedule:
 
-  * Fetch their most recent `workflowId` from `scheduleDesc.info.recentActions[0]`
-  * Check if the workflow has **COMPLETED**
-  * If so, it **pauses** the schedule (to avoid clutter and accidental re-triggers)
+- Iterates over `actions` and calls an activity
+- Relays logic to `handleAutoTriggerActions()` (defined in `activities/index.ts`)
+- Example actions: log event, send email (mocked)
+
+---
+
+### ✅ 3. `workflow/pauseSchedulesWithCompletedWorkflows.ts`
+
+This is a **workflow version of the schedule watcher**:
+
+- Runs the same logic as `scheduleWatcher.ts`
+- Queries all schedules
+- If any schedule’s last workflow is `COMPLETED`, it pauses that schedule
+- Used in scheduled cleanups (e.g. daily cleanup via Temporal)
+
+---
+
+### ✅ 4. `activities/index.ts`
+
+- Hosts all **activity functions**
+- Currently includes:
+  - `handleAutoTriggerActions`
+  - `pauseCompletedSchedules` (used by watcher logic or workflow cleanup)
+
+---
+
+### ✅ 5. `worker.ts`
+
+- Starts a Temporal worker on the `auto-triggers` task queue
+- Registers all workflows and activities
+- Uses `workflowsPath` pointing to `workflow/index.ts`
+
+---
+
+### ✅ 6. `scheduleWatcher.ts`
+
+- Manually run checker that:
+  - Lists all schedules
+  - Finds the last executed workflow ID from `.info.recentActions[0]`
+  - If the workflow is `COMPLETED`, it **pauses** the schedule
+
+---
+
+### ✅ 7. `createPauseMonitorSchedule.ts`
+
+- Sets up a **daily scheduled workflow** that runs `pauseSchedulesWithCompletedWorkflows`
+- This workflow uses the same watcher logic from above, but as a Temporal workflow
+- Prevents leftover active schedules from piling up
 
 ---
 
 ## 🔄 Runtime Flow
 
-1. You run `createSchedule.ts` → a schedule is created to run 1 hour from now.
-2. When the time arrives, Temporal triggers the workflow (`osExecuteAutoTriggerActions`).
-3. The workflow executes its `actions[]`, then calls an activity to **delete its own schedule**.
-4. Alternatively, `scheduleWatcher.ts` can detect that the workflow has finished and **pause** the schedule.
+1. **Create a schedule** with `createSchedule.ts`
+2. Workflow (`osExecuteAutoTriggerActions`) is triggered at the specified time
+3. Workflow executes its logic via activity
+4. Optionally, run `scheduleWatcher.ts` or the scheduled `pauseSchedulesWithCompletedWorkflows` workflow to pause completed schedules
 
----
-
-## ✅ Result
-
-You now have a full, deterministic Temporal system that:
-
-* Creates one-time schedules based on time
-* Executes dynamic logic on trigger
-* Cleans itself up automatically or via a watcher
-
----
 ---
 
 ## ✅ Prerequisites
 
-Make sure you've:
-
-* Installed Temporal via [`brew install temporal`](https://docs.temporal.io)
-* Installed dependencies (`npm install`)
-* Configured your project with:
-
-  * `package.json` with `"type": "module"`
-  * TypeScript support via `ts-node` and proper `"module": "esnext"` in `tsconfig.json`
-
----
-
-## ✅ Terminal Setup (3-Terminal Layout)
-
-### 🚪 **Terminal 1: Start Temporal Server**
-
-If using **Temporalite**:
-
-```bash
-temporalite start
-```
-
-Or using **full dev server**:
-
-```bash
-temporal server start-dev
-```
-
-This launches the Temporal backend at `localhost:7233`.
+- Temporal installed via [`brew install temporal`](https://docs.temporal.io)
+- Node.js + TypeScript
+- ESM support configured:
+  - "type": "module" in `package.json`
+  - "module": "esnext" in `tsconfig.json`
+- Dependencies installed:
+  ```bash
+  npm install
+  ```
 
 ---
 
-### 👷 **Terminal 2: Start Worker**
+## 🧪 Terminal Setup (3-Terminal Layout)
 
-```bash
-npx ts-node --esm worker.ts
-```
+| Terminal | Purpose                       | Command                                            |
+| -------- | ----------------------------- | -------------------------------------------------- |
+| 1        | Temporal server               | `temporalite start` or `temporal server start-dev` |
+| 2        | Worker (runs workflows)       | `npx ts-node --esm worker.ts`                      |
+| 3        | Create schedule               | `npx ts-node --esm createSchedule.ts`              |
+| 4 (opt.) | Watcher (pause cleanup)       | `npx ts-node --esm scheduleWatcher.ts`             |
+| 5 (opt.) | Schedule the watcher workflow | `npx ts-node --esm createPauseMonitorSchedule.ts`  |
 
-This runs your `worker.ts`, which listens on the `auto-triggers` task queue to execute workflows.
 
 ---
 
-### 🕐 **Terminal 3: Create Schedule**
-
-Create a one-time schedule to run a workflow 1 hour from now:
+## 🕒 Create a One-Time Workflow
 
 ```bash
 npx ts-node --esm createSchedule.ts
 ```
 
-✔️ Make sure your `createSchedule.ts` includes variable `triggerTime`, for Example:
+Inside the script:
 
 ```ts
 const triggerTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
@@ -134,27 +146,33 @@ const triggerTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
 
 ---
 
-## 🔁 (Optional) Monitor & Pause Completed Schedules
+## 🛑 (Optional) Cleanup via Watcher
 
-You can run the schedule watcher **manually** or via cron to auto-pause one-time schedules after they complete:
+**Manually** run this to pause completed workflows:
 
 ```bash
 npx ts-node --esm scheduleWatcher.ts
 ```
-
 This script:
 
 * Lists all schedules
 * Extracts the most recent workflowId
 * If the workflow is `COMPLETED`, it pauses the schedule
 
+Or run once daily by scheduling via:
+
+```bash
+npx ts-node --esm createPauseMonitorSchedule.ts
+```
+
+This ensures stale schedules don’t accumulate over time.
+
 ---
 
-## ✅ Summary Table
+## ✅ Summary
 
-| Terminal | Purpose                 | Command                                            |
-| -------- | ----------------------- | -------------------------------------------------- |
-| 1        | Temporal server         | `temporalite start` or `temporal server start-dev` |
-| 2        | Worker (runs workflows) | `npx ts-node --esm worker.ts`                      |
-| 3        | Create schedule         | `npx ts-node --esm createSchedule.ts`              |
-| 4 (opt.) | Watcher (pause cleanup) | `npx ts-node --esm scheduleWatcher.ts`             |
+This project supports:
+
+- One-time workflow execution via Temporal schedules
+- Dynamic configuration of actions and metadata
+- Post-run cleanup through either a watcher script or a scheduled cleanup workflow

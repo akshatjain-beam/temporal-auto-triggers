@@ -1,4 +1,4 @@
-import { Client, WorkflowNotFoundError } from '@temporalio/client';
+import { Client, WorkflowNotFoundError } from "@temporalio/client";
 
 async function run() {
   const client = new Client();
@@ -7,16 +7,17 @@ async function run() {
     for await (const summary of client.schedule.list()) {
       const scheduleId = summary.scheduleId;
       console.log(`🔍 Checking schedule: ${scheduleId}`);
-      
+
       const scheduleHandle = client.schedule.getHandle(scheduleId);
       const scheduleDesc = await scheduleHandle.describe();
 
-    //   console.log(`Schedule Description:`, JSON.stringify(scheduleDesc))
+      // console.log(`Schedule Description:`, JSON.stringify(scheduleDesc))
 
       const recentAction = scheduleDesc.info?.recentActions?.[0];
-        const workflowId = recentAction?.action?.type === 'startWorkflow'
-        ? recentAction.action.workflow?.workflowId
-        : undefined;
+      const workflowId =
+        recentAction?.action?.type === "startWorkflow"
+          ? recentAction.action.workflow?.workflowId
+          : undefined;
 
       if (!workflowId) {
         console.warn(`⚠️ Schedule '${scheduleId}' has no workflowId defined.`);
@@ -27,7 +28,7 @@ async function run() {
         const wfHandle = client.workflow.getHandle(workflowId);
         const wfDesc = await wfHandle.describe();
 
-        if (wfDesc.status.name === 'COMPLETED') {
+        if (wfDesc.status.name === "COMPLETED") {
           if (!scheduleDesc.state.paused) {
             await scheduleHandle.pause(
               `Paused after workflow '${workflowId}' completed.`
@@ -44,7 +45,10 @@ async function run() {
           );
         }
       } catch (err: any) {
-        if (err instanceof WorkflowNotFoundError || err.message?.includes('not found')) {
+        if (
+          err instanceof WorkflowNotFoundError ||
+          err.message?.includes("not found")
+        ) {
           console.warn(
             `⚠️ Workflow '${workflowId}' not found — maybe not triggered yet or has expired?`
           );
@@ -55,12 +59,11 @@ async function run() {
     }
   } finally {
     await client.connection.close();
-    console.log('🔌 Client connection closed');
+    console.log("🔌 Client connection closed");
   }
 }
 
 run().catch((err) => {
-  console.error('❌ Error in schedule workflow monitor:', err);
+  console.error("❌ Error in schedule workflow monitor:", err);
   process.exit(1);
 });
-
