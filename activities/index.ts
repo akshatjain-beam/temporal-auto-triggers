@@ -1,20 +1,27 @@
-import { Client, WorkflowNotFoundError } from '@temporalio/client';
+// activities/index.ts
+import { Client } from '@temporalio/client';
 
-async function run() {
+export async function handleAutoTriggerActions({ actions, data }: { actions: string[]; data: any }) {
+  console.log('📦 Actions:', actions);
+  console.log('📄 Data:', data);
+
+  for (const action of actions) {
+    console.log(`🔧 Executing action: ${action}`);
+    // Place real action logic here (e.g., send email, post webhook)
+  }
+}
+
+export async function pauseCompletedSchedules() {
   const client = new Client();
 
   try {
     for await (const summary of client.schedule.list()) {
       const scheduleId = summary.scheduleId;
-      console.log(`🔍 Checking schedule: ${scheduleId}`);
-      
       const scheduleHandle = client.schedule.getHandle(scheduleId);
       const scheduleDesc = await scheduleHandle.describe();
 
-     // console.log(`Schedule Description:`, JSON.stringify(scheduleDesc))
-
       const recentAction = scheduleDesc.info?.recentActions?.[0];
-        const workflowId = recentAction?.action?.type === 'startWorkflow'
+      const workflowId = recentAction?.action?.type === 'startWorkflow'
         ? recentAction.action.workflow?.workflowId
         : undefined;
 
@@ -29,25 +36,17 @@ async function run() {
 
         if (wfDesc.status.name === 'COMPLETED') {
           if (!scheduleDesc.state.paused) {
-            await scheduleHandle.pause(
-              `Paused after workflow '${workflowId}' completed.`
-            );
-            console.log(
-              `⏸️ Paused schedule '${scheduleId}' (workflow '${workflowId}' completed)`
-            );
+            await scheduleHandle.pause(`Paused after workflow ${workflowId} completed`);
+            console.log(`⏸️ Paused schedule '${scheduleId}' (workflow '${workflowId}' completed)`);
           } else {
             console.log(`ℹ️ Schedule '${scheduleId}' already paused`);
           }
         } else {
-          console.log(
-            `⏳ Workflow '${workflowId}' is still in status: ${wfDesc.status.name}`
-          );
+          console.log(`⏳ Workflow '${workflowId}' is still ${wfDesc.status.name}`);
         }
       } catch (err: any) {
-        if (err instanceof WorkflowNotFoundError || err.message?.includes('not found')) {
-          console.warn(
-            `⚠️ Workflow '${workflowId}' not found — maybe not triggered yet or has expired?`
-          );
+        if (err.message.includes('NotFound')) {
+          console.warn(`⚠️ Workflow '${workflowId}' not found — maybe not started yet?`);
         } else {
           throw err;
         }
@@ -58,9 +57,3 @@ async function run() {
     console.log('🔌 Client connection closed');
   }
 }
-
-run().catch((err) => {
-  console.error('❌ Error in schedule workflow monitor:', err);
-  process.exit(1);
-});
-
