@@ -1,0 +1,7 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@temporalio/client": "^1.11.8",
+    "@temporalio/worker": "^1.11.8"
+  }
+}
