@@ -4,6 +4,8 @@
 
 This project implements a **Temporal-based one-time workflow scheduling system** that allows pre-configured actions (like sending emails or logging events) to be executed relative to a future event (e.g. a user's check-in time). It also supports automatic cleanup (pause or delete) of completed schedules.
 
+Temporal Code Exchange - https://temporal.io/code-exchange/one-time-schedule-based-workflow-triggering
+
 ---
 
 ## 🧩 Folder Structure
